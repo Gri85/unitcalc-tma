@@ -66,7 +66,7 @@
           <button id="btnPresetMine" class="small">Мой пресет</button>
         </div>
         <div class="hint" style="margin-bottom:10px;">
-          На телефоне отправка дублируется ещё и через “MainButton” Telegram (самый стабильный вариант).
+          На телефоне отправка дублируется через Telegram MainButton.
         </div>
 
         <div class="row">
@@ -131,8 +131,7 @@
         </div>
 
         <div class="footer-note">
-          Если на телефоне “Отправить в чат” не работает, смотри строку “TG статус” выше.
-          В Telegram должен быть <b>sendData: yes</b>.
+          Если на телефоне “Отправить в чат” не видно — после нажатия тебя перебросит в чат бота автоматически.
         </div>
       </div>
 
@@ -261,6 +260,7 @@
     if (Profit > 0) { badgeText = "ОК: в плюсе"; badgeColor = "var(--good)"; }
     else if (Profit < 0) { badgeText = "Минус: не сходится"; badgeColor = "var(--bad)"; }
     else { badgeText = "В ноль"; badgeColor = "var(--warn)"; }
+
     outBadge.textContent = badgeText;
     outBadge.style.color = badgeColor;
     outProfit.style.color = Profit >= 0 ? "var(--good)" : "var(--bad)";
@@ -283,6 +283,7 @@
     const data = Object.fromEntries(ids.map(id => [id, el[id].value]));
     localStorage.setItem("unitcalc:preset:v1", JSON.stringify(data));
   }
+
   function loadPreset(){
     const raw = localStorage.getItem("unitcalc:preset:v1");
     if(!raw) return false;
@@ -323,9 +324,19 @@
         alert("Telegram WebApp API не найден (sendData=no). Открой через кнопку бота внутри Telegram.");
         return;
       }
-      tg.sendData(JSON.stringify(buildPayload()));
-      setTimeout(() => { try { tg.close(); } catch(e){} }, 200);
+
+      const payload = JSON.stringify(buildPayload());
+      tg.sendData(payload);
       tg?.HapticFeedback?.notificationOccurred("success");
+
+      // Ключевой фикс для iOS: после sendData сразу открываем чат бота
+      const botUser = tg.initDataUnsafe?.receiver?.username;
+      if (botUser) {
+        tg.openTelegramLink(`https://t.me/${botUser}`);
+      } else {
+        // fallback: просто закрыть
+        setTimeout(() => { try { tg.close(); } catch(e){} }, 200);
+      }
     }catch(e){
       alert("Ошибка отправки: " + (e?.message || e));
     }
@@ -336,11 +347,12 @@
     const sendOk = !!tg && (typeof tg.sendData === "function");
     const v = tg?.version || "—";
     const p = tg?.platform || "—";
+    const receiver = tg?.initDataUnsafe?.receiver?.username || "—";
     tgDebug.innerHTML =
-      `<b>TG API:</b> ${inTg ? "yes" : "no"} · <b>sendData:</b> ${sendOk ? "yes" : "no"} · <b>platform:</b> ${p} · <b>version:</b> ${v}`;
+      `<b>TG API:</b> ${inTg ? "yes" : "no"} · <b>sendData:</b> ${sendOk ? "yes" : "no"} · ` +
+      `<b>platform:</b> ${p} · <b>version:</b> ${v} · <b>bot:</b> ${receiver}`;
   }
 
-  // Telegram MainButton (очень стабильно на мобиле)
   function setupMainButton(){
     if (!tg?.MainButton) return;
     tg.MainButton.setText("Отправить в чат");
@@ -348,8 +360,8 @@
     tg.MainButton.show();
   }
 
-  // events
   ids.forEach(id => el[id].addEventListener("input", calc));
+
   document.getElementById("btnSave").addEventListener("click", () => { savePreset(); calc(); });
   document.getElementById("btnLoad").addEventListener("click", () => { loadPreset(); calc(); });
   document.getElementById("btnReset").addEventListener("click", () => { applyPreset(PRESETS.ozon_fbo); });
@@ -364,7 +376,6 @@
     calc();
   });
 
-  // init
   setDebug();
   setupMainButton();
   applyPreset(PRESETS.ozon_fbo);
