@@ -1,0 +1,327 @@
+﻿<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Юнит-экономика</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+  <style>
+    :root{
+      --bg: #ffffff;
+      --text: #111111;
+      --muted: rgba(0,0,0,.6);
+      --card: rgba(0,0,0,.04);
+      --border: rgba(0,0,0,.12);
+      --good: #1f8f3a;
+      --bad: #c92a2a;
+      --warn: #a66a00;
+      --radius: 14px;
+    }
+    html,body{height:100%;}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text);}
+    .wrap{max-width:760px;margin:0 auto;padding:14px 14px calc(14px + var(--tg-viewport-safe-area-inset-bottom, 0px));box-sizing:border-box;}
+    .h1{font-size:20px;font-weight:800;margin:8px 0 10px;}
+    .sub{font-size:13px;color:var(--muted);line-height:1.35;margin:0 0 12px;}
+    .grid{display:grid;grid-template-columns:1fr;gap:10px;}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:12px;}
+    .row{display:grid;grid-template-columns:1fr 140px;gap:10px;align-items:center;margin:8px 0;}
+    .row label{font-size:13px;color:var(--text);}
+    .hint{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.25;}
+    input[type="number"]{width:100%;box-sizing:border-box;padding:10px 10px;font-size:14px;border-radius:12px;border:1px solid var(--border);background:rgba(255,255,255,.65);color:var(--text);outline:none;}
+    input[type="number"]:focus{border-color:rgba(0,0,0,.25);}
+    .results{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+    .kpi{padding:12px;border-radius:var(--radius);border:1px solid var(--border);background:rgba(255,255,255,.55);}
+    .kpi .name{font-size:12px;color:var(--muted);margin-bottom:6px;}
+    .kpi .val{font-size:18px;font-weight:800;}
+    .badge{display:inline-block;margin-top:8px;padding:6px 10px;border-radius:999px;font-size:12px;border:1px solid var(--border);background:rgba(255,255,255,.6);}
+    .btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;}
+    button{appearance:none;border:1px solid var(--border);background:rgba(255,255,255,.65);padding:10px 12px;border-radius:12px;color:var(--text);font-weight:700;cursor:pointer;}
+    button:active{transform:translateY(1px);}
+    .small{font-size:12px;font-weight:700;}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;}
+    .footer-note{font-size:12px;color:var(--muted);margin-top:10px;line-height:1.3;}
+    @media (min-width: 720px){
+      .grid{grid-template-columns:1.2fr .8fr;}
+      .results{grid-template-columns:repeat(2,1fr);}
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="h1">Калькулятор юнит-экономики</div>
+    <div class="sub">
+      Прибыль = (Цена − Комиссия) − Налог − Себестоимость − Логистика − Упаковка − Прочее − Реклама − Ожид.возвраты.
+      <span class="mono" id="srcTag"></span>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <div class="row">
+          <label>Цена продажи (₽) <span class="hint">P</span></label>
+          <input id="P" type="number" step="1" min="0" value="999">
+        </div>
+
+        <div class="row">
+          <label>Себестоимость (₽) <span class="hint">COGS</span></label>
+          <input id="COGS" type="number" step="1" min="0" value="450">
+        </div>
+
+        <div class="row">
+          <label>Комиссия маркетплейса (%) <span class="hint">c</span></label>
+          <input id="c" type="number" step="0.1" min="0" value="15">
+        </div>
+
+        <div class="row">
+          <label>Логистика/доставка за заказ (₽) <span class="hint">L</span></label>
+          <input id="L" type="number" step="1" min="0" value="120">
+        </div>
+
+        <div class="row">
+          <label>Упаковка/расходники (₽) <span class="hint">Pack</span></label>
+          <input id="Pack" type="number" step="1" min="0" value="25">
+        </div>
+
+        <div class="row">
+          <label>Реклама на заказ / CPO (₽) <span class="hint">Ad</span></label>
+          <input id="Ad" type="number" step="1" min="0" value="80">
+        </div>
+
+        <div class="row">
+          <label>Налог с оборота (%) <span class="hint">tax</span></label>
+          <input id="tax" type="number" step="0.1" min="0" value="0">
+        </div>
+
+        <div class="row">
+          <label>Выкуп (%) <span class="hint">buyout</span></label>
+          <input id="buyout" type="number" step="0.1" min="0" max="100" value="92">
+        </div>
+        <div class="hint">
+          Выкуп 92% = возвраты 8%. Возвраты учитываем как <b>ожидаемую</b> стоимость обратной логистики.
+        </div>
+
+        <div class="row" style="margin-top:10px;">
+          <label>Стоимость возврата/обратной логистики (₽) <span class="hint">Rcost</span></label>
+          <input id="Rcost" type="number" step="1" min="0" value="70">
+        </div>
+
+        <div class="row">
+          <label>Прочие расходы на заказ (₽) <span class="hint">Other</span></label>
+          <input id="Other" type="number" step="1" min="0" value="0">
+        </div>
+
+        <div class="btns">
+          <button id="btnSave" class="small">Сохранить пресет</button>
+          <button id="btnLoad" class="small">Загрузить пресет</button>
+          <button id="btnReset" class="small">Сброс</button>
+          <button id="btnCopy" class="small">Скопировать итог</button>
+          <button id="btnSend" class="small">Отправить в чат</button>
+        </div>
+
+        <div class="footer-note">
+          “Отправить в чат” пришлёт данные в бота через Telegram.WebApp.sendData().
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="results">
+          <div class="kpi">
+            <div class="name">Прибыль (₽)</div>
+            <div class="val" id="Profit">—</div>
+            <div class="badge" id="Badge">—</div>
+          </div>
+
+          <div class="kpi">
+            <div class="name">Маржа (% от цены)</div>
+            <div class="val" id="Margin">—</div>
+          </div>
+
+          <div class="kpi">
+            <div class="name">Max CPO (₽) при Profit=0</div>
+            <div class="val" id="AdMax">—</div>
+          </div>
+
+          <div class="kpi">
+            <div class="name">Цена безубыточности (₽)</div>
+            <div class="val" id="PBE">—</div>
+            <div class="hint" id="PBEHint"></div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:10px;">
+          <div class="name" style="font-size:12px;color:var(--muted);margin-bottom:6px;">Разбор (₽)</div>
+          <div class="hint" id="Breakdown"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  const tg = window.Telegram?.WebApp;
+  if (tg) {
+    tg.ready();
+    tg.expand();
+    const tp = tg.themeParams || {};
+    if (tp.bg_color) document.documentElement.style.setProperty('--bg', tp.bg_color);
+    if (tp.text_color) document.documentElement.style.setProperty('--text', tp.text_color);
+    if (tp.hint_color) document.documentElement.style.setProperty('--muted', tp.hint_color);
+    if (tp.secondary_bg_color) document.documentElement.style.setProperty('--card', tp.secondary_bg_color);
+  }
+
+  const url = new URL(window.location.href);
+  const src = url.searchParams.get('src');
+  document.getElementById('srcTag').textContent = src ? `(src=${src})` : '';
+
+  const fmtRub = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 });
+  const fmtPct = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 1 });
+
+  const ids = ["P","COGS","c","L","Pack","Ad","tax","buyout","Rcost","Other"];
+  const el = Object.fromEntries(ids.map(id => [id, document.getElementById(id)]));
+
+  const outProfit = document.getElementById('Profit');
+  const outMargin = document.getElementById('Margin');
+  const outAdMax  = document.getElementById('AdMax');
+  const outPBE    = document.getElementById('PBE');
+  const outPBEHint= document.getElementById('PBEHint');
+  const outBadge  = document.getElementById('Badge');
+  const outBreak  = document.getElementById('Breakdown');
+
+  function n(v){
+    const x = parseFloat(String(v).replace(',', '.'));
+    return isFinite(x) ? x : 0;
+  }
+
+  function calc(){
+    const P = n(el.P.value);
+    const COGS = n(el.COGS.value);
+    const cRate = n(el.c.value)/100;
+    const L = n(el.L.value);
+    const Pack = n(el.Pack.value);
+    const Ad = n(el.Ad.value);
+    const tRate = n(el.tax.value)/100;
+    const buyout = n(el.buyout.value);
+    const r = Math.max(0, Math.min(1, 1 - buyout/100));
+    const Rcost = n(el.Rcost.value);
+    const Other = n(el.Other.value);
+
+    const Commission = P * cRate;
+    const Rev = P - Commission;
+    const Tax = P * tRate;
+    const Ret = r * Rcost;
+
+    const Profit = Rev - Tax - COGS - L - Pack - Other - Ad - Ret;
+    const Margin = (P > 0) ? (Profit / P * 100) : 0;
+
+    const AdMax = Rev - Tax - COGS - L - Pack - Other - Ret;
+
+    const denom = (1 - cRate - tRate);
+    let PBE = null;
+    if (denom > 0) {
+      PBE = (COGS + L + Pack + Other + Ad + Ret) / denom;
+    }
+
+    outProfit.textContent = fmtRub.format(Profit) + " ₽";
+    outMargin.textContent = fmtPct.format(Margin) + " %";
+    outAdMax.textContent  = fmtRub.format(AdMax) + " ₽";
+
+    if (PBE === null || !isFinite(PBE)) {
+      outPBE.textContent = "—";
+      outPBEHint.textContent = "Невозможно: комиссия+налог ≥ 100%";
+    } else {
+      outPBE.textContent = fmtRub.format(PBE) + " ₽";
+      outPBEHint.textContent = "";
+    }
+
+    let badgeText = "";
+    let badgeColor = "var(--warn)";
+    if (Profit > 0) { badgeText = "ОК: в плюсе"; badgeColor = "var(--good)"; }
+    else if (Profit < 0) { badgeText = "Минус: не сходится"; badgeColor = "var(--bad)"; }
+    else { badgeText = "В ноль"; badgeColor = "var(--warn)"; }
+    outBadge.textContent = badgeText;
+    outBadge.style.color = badgeColor;
+    outProfit.style.color = Profit >= 0 ? "var(--good)" : "var(--bad)";
+
+    outBreak.innerHTML =
+      `Цена: <b>${fmtRub.format(P)} ₽</b><br>` +
+      `Комиссия: ${fmtRub.format(Commission)} ₽ (${fmtPct.format(cRate*100)}%)<br>` +
+      `Налог: ${fmtRub.format(Tax)} ₽ (${fmtPct.format(tRate*100)}%)<br>` +
+      `Себестоимость: ${fmtRub.format(COGS)} ₽<br>` +
+      `Логистика: ${fmtRub.format(L)} ₽<br>` +
+      `Упаковка: ${fmtRub.format(Pack)} ₽<br>` +
+      `Прочее: ${fmtRub.format(Other)} ₽<br>` +
+      `Реклама (CPO): ${fmtRub.format(Ad)} ₽<br>` +
+      `Возвраты (ожид.): ${fmtRub.format(Ret)} ₽ (возврат ${fmtPct.format(r*100)}% × ${fmtRub.format(Rcost)} ₽)`;
+
+    return { P, Profit, Margin, AdMax, PBE };
+  }
+
+  function savePreset(){
+    const data = Object.fromEntries(ids.map(id => [id, el[id].value]));
+    localStorage.setItem("unitcalc:preset:v1", JSON.stringify(data));
+  }
+  function loadPreset(){
+    const raw = localStorage.getItem("unitcalc:preset:v1");
+    if(!raw) return false;
+    const data = JSON.parse(raw);
+    ids.forEach(id => { if (data[id] != null) el[id].value = data[id]; });
+    return true;
+  }
+  function reset(){
+    el.P.value = 999;
+    el.COGS.value = 450;
+    el.c.value = 15;
+    el.L.value = 120;
+    el.Pack.value = 25;
+    el.Ad.value = 80;
+    el.tax.value = 0;
+    el.buyout.value = 92;
+    el.Rcost.value = 70;
+    el.Other.value = 0;
+  }
+
+  async function copySummary(){
+    const r = calc();
+    const lines = [
+      `Юнит-экономика`,
+      `Цена: ${Math.round(r.P)} ₽`,
+      `Прибыль: ${Math.round(r.Profit)} ₽`,
+      `Маржа: ${r.Margin.toFixed(1)} %`,
+      `Max CPO: ${Math.round(r.AdMax)} ₽`,
+      `Цена безубыточности: ${r.PBE ? Math.round(r.PBE) : "—"} ₽`,
+    ].join("\n");
+    await navigator.clipboard.writeText(lines);
+    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
+  }
+
+  function sendToChat(){
+    if (!tg?.sendData) {
+      alert("Открой калькулятор из Telegram, через кнопку в боте.");
+      return;
+    }
+    const r = calc();
+    const payload = {
+      profit: Math.round(r.Profit),
+      margin: Number(r.Margin.toFixed(1)),
+      adMax: Math.round(r.AdMax),
+      pBe: r.PBE ? Math.round(r.PBE) : null,
+    };
+    tg.sendData(JSON.stringify(payload));
+    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
+  }
+
+  ids.forEach(id => el[id].addEventListener("input", calc));
+
+  document.getElementById("btnSave").addEventListener("click", () => { savePreset(); calc(); });
+  document.getElementById("btnLoad").addEventListener("click", () => { loadPreset(); calc(); });
+  document.getElementById("btnReset").addEventListener("click", () => { reset(); calc(); });
+  document.getElementById("btnCopy").addEventListener("click", copySummary);
+  document.getElementById("btnSend").addEventListener("click", sendToChat);
+
+  loadPreset();
+  calc();
+})();
+</script>
+</body>
+</html>
