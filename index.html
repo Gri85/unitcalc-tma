@@ -16,7 +16,7 @@
     body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text);}
     .wrap{max-width:760px;margin:0 auto;padding:14px 14px calc(14px + var(--tg-viewport-safe-area-inset-bottom, 0px));box-sizing:border-box;}
     .h1{font-size:20px;font-weight:800;margin:8px 0 10px;}
-    .sub{font-size:13px;color:var(--muted);line-height:1.35;margin:0 0 12px;}
+    .sub{font-size:13px;color:var(--muted);line-height:1.35;margin:0 0 8px;}
     .grid{display:grid;grid-template-columns:1fr;gap:10px;}
     .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:12px;}
     .row{display:grid;grid-template-columns:1fr 140px;gap:10px;align-items:center;margin:8px 0;}
@@ -37,6 +37,8 @@
     .footer-note{font-size:12px;color:var(--muted);margin-top:10px;line-height:1.3;}
     .preset-bar{display:flex;gap:8px;flex-wrap:wrap;margin:2px 0 10px;}
     .preset-title{font-size:12px;color:var(--muted);margin:0 0 6px;}
+    .debug{font-size:12px;border:1px dashed var(--border);border-radius:12px;padding:10px;background:rgba(255,255,255,.55);margin:0 0 12px;line-height:1.35;}
+    .debug b{color:var(--text);}
     @media (min-width: 720px){
       .grid{grid-template-columns:1.2fr .8fr;}
       .results{grid-template-columns:repeat(2,1fr);}
@@ -52,6 +54,8 @@
       <span class="mono" id="srcTag"></span>
     </div>
 
+    <div class="debug" id="tgDebug">TG статус: …</div>
+
     <div class="grid">
       <div class="card">
 
@@ -62,7 +66,7 @@
           <button id="btnPresetMine" class="small">Мой пресет</button>
         </div>
         <div class="hint" style="margin-bottom:10px;">
-          “Озон FBO/FBS” — это шаблоны. Подгони цифры под свои реальные комиссии/логистику. “Мой пресет” загружается из “Сохранить пресет”.
+          На телефоне отправка дублируется ещё и через “MainButton” Telegram (самый стабильный вариант).
         </div>
 
         <div class="row">
@@ -127,7 +131,8 @@
         </div>
 
         <div class="footer-note">
-          “Отправить в чат” пришлёт данные в бота через Telegram.WebApp.sendData().
+          Если на телефоне “Отправить в чат” не работает, смотри строку “TG статус” выше.
+          В Telegram должен быть <b>sendData: yes</b>.
         </div>
       </div>
 
@@ -167,6 +172,7 @@
 <script>
 (function(){
   const tg = window.Telegram?.WebApp;
+
   if (tg) {
     tg.ready();
     tg.expand();
@@ -194,6 +200,7 @@
   const outPBEHint= document.getElementById('PBEHint');
   const outBadge  = document.getElementById('Badge');
   const outBreak  = document.getElementById('Breakdown');
+  const tgDebug   = document.getElementById('tgDebug');
 
   function n(v){
     const x = parseFloat(String(v).replace(',', '.'));
@@ -201,18 +208,12 @@
   }
 
   const PRESETS = {
-    ozon_fbo: { // шаблон (подгони под себя)
-      P: 999, COGS: 450, c: 15, L: 120, Pack: 25, Ad: 80, tax: 0, buyout: 92, Rcost: 70, Other: 0
-    },
-    ozon_fbs: { // шаблон (подгони под себя)
-      P: 999, COGS: 450, c: 15, L: 170, Pack: 35, Ad: 80, tax: 0, buyout: 92, Rcost: 110, Other: 0
-    }
+    ozon_fbo: { P:999, COGS:450, c:15, L:120, Pack:25, Ad:80, tax:0, buyout:92, Rcost:70, Other:0 },
+    ozon_fbs: { P:999, COGS:450, c:15, L:170, Pack:35, Ad:80, tax:0, buyout:92, Rcost:110, Other:0 }
   };
 
   function applyPreset(p){
-    ids.forEach(id => {
-      if (p[id] !== undefined && p[id] !== null) el[id].value = p[id];
-    });
+    ids.forEach(id => { if (p[id] != null) el[id].value = p[id]; });
     calc();
   }
 
@@ -241,9 +242,7 @@
 
     const denom = (1 - cRate - tRate);
     let PBE = null;
-    if (denom > 0) {
-      PBE = (COGS + L + Pack + Other + Ad + Ret) / denom;
-    }
+    if (denom > 0) PBE = (COGS + L + Pack + Other + Ad + Ret) / denom;
 
     outProfit.textContent = fmtRub.format(Profit) + " ₽";
     outMargin.textContent = fmtPct.format(Margin) + " %";
@@ -291,9 +290,6 @@
     ids.forEach(id => { if (data[id] != null) el[id].value = data[id]; });
     return true;
   }
-  function reset(){
-    applyPreset(PRESETS.ozon_fbo);
-  }
 
   async function copySummary(){
     const r = calc();
@@ -306,30 +302,56 @@
       `Цена безубыточности: ${r.PBE ? Math.round(r.PBE) : "—"} ₽`,
     ].join("\n");
     await navigator.clipboard.writeText(lines);
-    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
+    tg?.HapticFeedback?.notificationOccurred("success");
   }
 
-  function sendToChat(){
-    if (!tg?.sendData) {
-      alert("Открой калькулятор из Telegram, через кнопку в боте.");
-      return;
-    }
+  function buildPayload(){
     const r = calc();
-    const payload = {
+    return {
       profit: Math.round(r.Profit),
       margin: Number(r.Margin.toFixed(1)),
       adMax: Math.round(r.AdMax),
       pBe: r.PBE ? Math.round(r.PBE) : null,
+      ts: Date.now(),
+      platform: tg?.platform || "unknown"
     };
-    tg.sendData(JSON.stringify(payload));
-    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
   }
 
-  ids.forEach(id => el[id].addEventListener("input", calc));
+  function sendToChat(){
+    try{
+      if (!tg || typeof tg.sendData !== "function") {
+        alert("Telegram WebApp API не найден (sendData=no). Открой через кнопку бота внутри Telegram.");
+        return;
+      }
+      tg.sendData(JSON.stringify(buildPayload()));
+      tg?.HapticFeedback?.notificationOccurred("success");
+    }catch(e){
+      alert("Ошибка отправки: " + (e?.message || e));
+    }
+  }
 
+  function setDebug(){
+    const inTg = !!tg;
+    const sendOk = !!tg && (typeof tg.sendData === "function");
+    const v = tg?.version || "—";
+    const p = tg?.platform || "—";
+    tgDebug.innerHTML =
+      `<b>TG API:</b> ${inTg ? "yes" : "no"} · <b>sendData:</b> ${sendOk ? "yes" : "no"} · <b>platform:</b> ${p} · <b>version:</b> ${v}`;
+  }
+
+  // Telegram MainButton (очень стабильно на мобиле)
+  function setupMainButton(){
+    if (!tg?.MainButton) return;
+    tg.MainButton.setText("Отправить в чат");
+    tg.MainButton.onClick(sendToChat);
+    tg.MainButton.show();
+  }
+
+  // events
+  ids.forEach(id => el[id].addEventListener("input", calc));
   document.getElementById("btnSave").addEventListener("click", () => { savePreset(); calc(); });
   document.getElementById("btnLoad").addEventListener("click", () => { loadPreset(); calc(); });
-  document.getElementById("btnReset").addEventListener("click", () => { reset(); calc(); });
+  document.getElementById("btnReset").addEventListener("click", () => { applyPreset(PRESETS.ozon_fbo); });
   document.getElementById("btnCopy").addEventListener("click", copySummary);
   document.getElementById("btnSend").addEventListener("click", sendToChat);
 
@@ -341,7 +363,9 @@
     calc();
   });
 
-  // старт: по умолчанию FBO-шаблон
+  // init
+  setDebug();
+  setupMainButton();
   applyPreset(PRESETS.ozon_fbo);
 })();
 </script>
