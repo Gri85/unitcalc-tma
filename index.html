@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="ru">
 <head>
   <meta charset="utf-8" />
@@ -8,15 +8,9 @@
 
   <style>
     :root{
-      --bg: #ffffff;
-      --text: #111111;
-      --muted: rgba(0,0,0,.6);
-      --card: rgba(0,0,0,.04);
-      --border: rgba(0,0,0,.12);
-      --good: #1f8f3a;
-      --bad: #c92a2a;
-      --warn: #a66a00;
-      --radius: 14px;
+      --bg:#ffffff; --text:#111111; --muted:rgba(0,0,0,.6);
+      --card:rgba(0,0,0,.04); --border:rgba(0,0,0,.12);
+      --good:#1f8f3a; --bad:#c92a2a; --warn:#a66a00; --radius:14px;
     }
     html,body{height:100%;}
     body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text);}
@@ -41,6 +35,8 @@
     .small{font-size:12px;font-weight:700;}
     .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;}
     .footer-note{font-size:12px;color:var(--muted);margin-top:10px;line-height:1.3;}
+    .preset-bar{display:flex;gap:8px;flex-wrap:wrap;margin:2px 0 10px;}
+    .preset-title{font-size:12px;color:var(--muted);margin:0 0 6px;}
     @media (min-width: 720px){
       .grid{grid-template-columns:1.2fr .8fr;}
       .results{grid-template-columns:repeat(2,1fr);}
@@ -58,6 +54,17 @@
 
     <div class="grid">
       <div class="card">
+
+        <div class="preset-title">Пресеты</div>
+        <div class="preset-bar">
+          <button id="btnPresetFBO" class="small">Озон FBO</button>
+          <button id="btnPresetFBS" class="small">Озон FBS</button>
+          <button id="btnPresetMine" class="small">Мой пресет</button>
+        </div>
+        <div class="hint" style="margin-bottom:10px;">
+          “Озон FBO/FBS” — это шаблоны. Подгони цифры под свои реальные комиссии/логистику. “Мой пресет” загружается из “Сохранить пресет”.
+        </div>
+
         <div class="row">
           <label>Цена продажи (₽) <span class="hint">P</span></label>
           <input id="P" type="number" step="1" min="0" value="999">
@@ -193,6 +200,22 @@
     return isFinite(x) ? x : 0;
   }
 
+  const PRESETS = {
+    ozon_fbo: { // шаблон (подгони под себя)
+      P: 999, COGS: 450, c: 15, L: 120, Pack: 25, Ad: 80, tax: 0, buyout: 92, Rcost: 70, Other: 0
+    },
+    ozon_fbs: { // шаблон (подгони под себя)
+      P: 999, COGS: 450, c: 15, L: 170, Pack: 35, Ad: 80, tax: 0, buyout: 92, Rcost: 110, Other: 0
+    }
+  };
+
+  function applyPreset(p){
+    ids.forEach(id => {
+      if (p[id] !== undefined && p[id] !== null) el[id].value = p[id];
+    });
+    calc();
+  }
+
   function calc(){
     const P = n(el.P.value);
     const COGS = n(el.COGS.value);
@@ -269,16 +292,7 @@
     return true;
   }
   function reset(){
-    el.P.value = 999;
-    el.COGS.value = 450;
-    el.c.value = 15;
-    el.L.value = 120;
-    el.Pack.value = 25;
-    el.Ad.value = 80;
-    el.tax.value = 0;
-    el.buyout.value = 92;
-    el.Rcost.value = 70;
-    el.Other.value = 0;
+    applyPreset(PRESETS.ozon_fbo);
   }
 
   async function copySummary(){
@@ -319,8 +333,16 @@
   document.getElementById("btnCopy").addEventListener("click", copySummary);
   document.getElementById("btnSend").addEventListener("click", sendToChat);
 
-  loadPreset();
-  calc();
+  document.getElementById("btnPresetFBO").addEventListener("click", () => applyPreset(PRESETS.ozon_fbo));
+  document.getElementById("btnPresetFBS").addEventListener("click", () => applyPreset(PRESETS.ozon_fbs));
+  document.getElementById("btnPresetMine").addEventListener("click", () => {
+    const ok = loadPreset();
+    if (!ok) alert("Сначала выставь числа и нажми «Сохранить пресет».");
+    calc();
+  });
+
+  // старт: по умолчанию FBO-шаблон
+  applyPreset(PRESETS.ozon_fbo);
 })();
 </script>
 </body>
