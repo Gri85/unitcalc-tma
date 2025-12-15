@@ -324,6 +324,7 @@
         return;
       }
       tg.sendData(JSON.stringify(buildPayload()));
+      setTimeout(() => { try { tg.close(); } catch(e){} }, 200);
       tg?.HapticFeedback?.notificationOccurred("success");
     }catch(e){
       alert("Ошибка отправки: " + (e?.message || e));
